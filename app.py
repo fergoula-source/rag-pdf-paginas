@@ -2,6 +2,7 @@ import streamlit as st
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
 import numpy as np
+import ollama
 
 
 @st.cache_resource
@@ -56,10 +57,6 @@ if arquivo is not None:
 
         st.success("Embeddings criados com sucesso.")
 
-        st.write(
-            f"Formato dos embeddings: {embeddings.shape}"
-        )
-
         pergunta = st.text_input(
             "Faça uma pergunta sobre o PDF"
         )
@@ -72,17 +69,69 @@ if arquivo is not None:
 
             similaridades = embeddings @ embedding_pergunta
 
-            indices = np.argsort(similaridades)[::-1][:3]
+            quantidade = min(3, len(chunks))
+
+            indices = np.argsort(
+                similaridades
+            )[::-1][:quantidade]
 
             st.subheader("Páginas mais relacionadas")
 
+            contexto = ""
+
             for indice in indices:
+                pagina = chunks[indice]["pagina"]
+                texto = chunks[indice]["texto"]
+
                 st.write(
-                    f"Página {chunks[indice]['pagina']} "
-                    f"- Similaridade: {similaridades[indice]:.3f}"
+                    f"Página {pagina} - "
+                    f"Similaridade: {similaridades[indice]:.3f}"
+                )
+
+                contexto += (
+                    f"\n\nPágina {pagina}:\n{texto}"
+                )
+
+            prompt = f"""
+Responda a pergunta usando somente as informações
+encontradas no contexto abaixo.
+
+Se a resposta não estiver no contexto, informe que
+a informação não foi encontrada no PDF.
+
+CONTEXTO:
+{contexto}
+
+PERGUNTA:
+{pergunta}
+"""
+
+            st.subheader("Resposta")
+
+            try:
+                resposta = ollama.chat(
+                    model="llama3.2:1b",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+
+                st.write(
+                    resposta["message"]["content"]
+                )
+
+            except Exception:
+                st.warning(
+                    "Não foi possível acessar o Ollama. "
+                    "Verifique se ele está instalado e executando."
                 )
 
     with st.expander("Ver páginas separadas"):
         for chunk in chunks:
-            st.subheader(f"Página {chunk['pagina']}")
+            st.subheader(
+                f"Página {chunk['pagina']}"
+            )
             st.write(chunk["texto"])
