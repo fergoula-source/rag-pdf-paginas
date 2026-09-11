@@ -60,6 +60,28 @@ if arquivo is not None:
             f"Formato dos embeddings: {embeddings.shape}"
         )
 
+        pergunta = st.text_input(
+            "Faça uma pergunta sobre o PDF"
+        )
+
+        if pergunta:
+            embedding_pergunta = modelo.encode(
+                [pergunta],
+                normalize_embeddings=True
+            )[0]
+
+            similaridades = embeddings @ embedding_pergunta
+
+            indices = np.argsort(similaridades)[::-1][:3]
+
+            st.subheader("Páginas mais relacionadas")
+
+            for indice in indices:
+                st.write(
+                    f"Página {chunks[indice]['pagina']} "
+                    f"- Similaridade: {similaridades[indice]:.3f}"
+                )
+
     with st.expander("Ver páginas separadas"):
         for chunk in chunks:
             st.subheader(f"Página {chunk['pagina']}")
